@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ES Tailor — 企業に合わせるES作成支援</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E" />
 <style>
   :root{
     --bg:#f5f6fa; --panel:#ffffff; --line:#e3e6ee; --ink:#1d2433; --muted:#6b7488;
@@ -64,12 +65,38 @@
   .disc{font-size:12px;color:var(--muted);text-align:center;padding:18px}
   details{margin-top:10px}summary{cursor:pointer;font-size:13px;color:var(--accent-d)}
   .seedbox{font-size:12px;color:var(--muted);margin-top:6px}
+  /* AI features */
+  .ai-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px;border-radius:999px;
+    background:rgba(255,255,255,.15);margin-left:10px}
+  .ai-status .dot{width:8px;height:8px;border-radius:50%}
+  .ai-on .dot{background:#34d399}.ai-off .dot{background:#fbbf24}
+  .ai-btn{background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:13px;
+    font-weight:600;cursor:pointer;white-space:nowrap}
+  .ai-btn:hover{background:#0284c7}.ai-btn:disabled{opacity:.6;cursor:wait}
+  .inline-row{display:flex;gap:8px;align-items:flex-start;margin-top:5px}
+  .inline-row input{margin-top:0}
+  .uploader{border:1.5px dashed #c3cad9;border-radius:10px;padding:14px;text-align:center;cursor:pointer;
+    background:#fafbff;transition:.15s;margin-bottom:12px}
+  .uploader:hover,.uploader.drag{border-color:var(--accent);background:#f0f5ff}
+  .uploader small{color:var(--muted);display:block;margin-top:4px}
+  .filelist{font-size:12px;color:var(--ink);margin:6px 0 0;text-align:left}
+  .filelist li{padding:2px 0}
+  .spinner{width:14px;height:14px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;
+    display:inline-block;animation:spin .7s linear infinite;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ai-msg{font-size:12px;margin-top:6px}.ai-msg.err{color:var(--bad)}.ai-msg.ok{color:var(--ok)}
+  .gen-btn.ai{background:linear-gradient(120deg,#2563eb,#0ea5e9)}
+  .gen-row{display:flex;gap:10px}.gen-row .gen-btn{margin-top:0}
+  .gen-btn.secondary{background:#fff;color:var(--accent-d);border:1px solid var(--line);flex:0 0 auto}
+  .gen-btn.secondary:hover{border-color:var(--accent);background:#f5f8ff}
+  .sources{font-size:11px;color:var(--muted);margin-top:6px}
+  .sources a{color:var(--accent-d)}
 </style>
 </head>
 <body>
 <header>
-  <h1>📝 ES Tailor — 企業に合わせるES作成支援</h1>
-  <p>会社情報とあなたの経験を入力すると、その企業の価値観に接続した「受かるESの型」であなた自身のES下書きを組み立てます。</p>
+  <h1>📝 ES Tailor — 企業に合わせるES作成支援 <span id="aiStatus" class="ai-status ai-off"><span class="dot"></span><span id="aiStatusTxt">AI状態を確認中…</span></span></h1>
+  <p>会社情報とあなたの経験を入力すると、その企業の価値観に接続した「受かるESの型」であなた自身のES下書きを組み立てます。AI有効時は企業情報の自動検索・過去ESの読み込み・本格生成が使えます。</p>
 </header>
 
 <div class="wrap">
@@ -78,8 +105,12 @@
     <div class="card">
       <h2><span class="n">1</span>企業の情報</h2>
       <label class="f">会社名<span class="req">*</span>
-        <input id="company" type="text" placeholder="例：株式会社〇〇" />
+        <div class="inline-row">
+          <input id="company" type="text" placeholder="例：株式会社〇〇" />
+          <button class="ai-btn" id="researchBtn" type="button" title="AIが企業情報を検索して下の欄を自動入力">🔍 AIで検索</button>
+        </div>
       </label>
+      <div class="ai-msg" id="researchMsg"></div>
       <div class="seedbox">よく知られた企業の公開理念キーワードを参考に入れられます（必ず公式HPで確認・編集してください）：</div>
       <div class="chips" id="seedChips"></div>
       <label class="f" style="margin-top:10px">企業の理念・求める人物像キーワード<span class="req">*</span>
@@ -106,6 +137,13 @@
 
     <div class="card">
       <h2><span class="n">3</span>あなたの経験（素材）</h2>
+      <div class="uploader" id="uploader">
+        📎 過去のES（PDF / Word / テキスト）をドラッグ＆ドロップ、またはクリックして選択
+        <small>AIが内容を読み取り、下の各欄を自動入力します（最大5ファイル）</small>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.md" multiple hidden />
+        <ul class="filelist" id="fileList"></ul>
+      </div>
+      <div class="ai-msg" id="uploadMsg"></div>
       <label class="f">あなたの強み（一言）<span class="req">*</span>
         <input id="strength" type="text" placeholder="例：粘り強く周囲を巻き込む力" />
       </label>
@@ -132,7 +170,10 @@
       </label>
     </div>
 
-    <button class="gen-btn" id="gen">✍️ ESを生成する</button>
+    <div class="gen-row">
+      <button class="gen-btn ai" id="genAi">🤖 AIで生成する</button>
+      <button class="gen-btn secondary" id="gen" title="APIを使わずに、入力からテンプレートで組み立てます">テンプレート</button>
+    </div>
   </div>
 
   <!-- ============ OUTPUT ============ -->
@@ -391,6 +432,105 @@ el('download').onclick=()=>{
   const blob=new Blob([el('out').innerText],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`ES_${val('company')||'draft'}_${activeType}.txt`;a.click();
+};
+
+/* =================== AI 連携 =================== */
+let AI_ON=false;
+let pastEsText=''; // アップロードしたESの本文（生成時に文体参考として送る）
+
+function setMsg(id,text,kind){const e=el(id);e.textContent=text||'';e.className='ai-msg'+(kind?' '+kind:'');}
+
+// AI有効/無効をヘルスチェック
+(async()=>{
+  try{
+    const r=await fetch('/api/health');const j=await r.json();
+    AI_ON=!!j.ai;
+    const s=el('aiStatus');
+    if(AI_ON){s.className='ai-status ai-on';el('aiStatusTxt').textContent='AI有効 ('+j.model+')';}
+    else{s.className='ai-status ai-off';el('aiStatusTxt').textContent='AI未設定（テンプレートのみ）';}
+  }catch{
+    el('aiStatus').className='ai-status ai-off';
+    el('aiStatusTxt').textContent='オフライン（テンプレートのみ）';
+  }
+  if(!AI_ON){
+    // バックエンドが無い/未設定: AI系UIは案内のみ
+    el('genAi').disabled=false; // 押すとテンプレにフォールバック
+  }
+})();
+
+// ---- 1) 企業情報をAI検索 ----
+el('researchBtn').onclick=async()=>{
+  const company=val('company');
+  if(!company){alert('会社名を入力してください。');return;}
+  if(!AI_ON){setMsg('researchMsg','AI未設定のため検索できません。公式HPからキーワードを手入力してください。','err');return;}
+  const btn=el('researchBtn');const old=btn.innerHTML;
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 検索中…';
+  setMsg('researchMsg','企業情報をAIが調査しています（10〜30秒）…');
+  try{
+    const r=await fetch('/api/research-company',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'検索に失敗しました');
+    if(j.values&&j.values.length)el('values').value=j.values.join(', ');
+    if(j.appeal)el('appeal').value=j.appeal+(j.culture?(' / '+j.culture):'');
+    if(j.official_name&&!val('company'))el('company').value=j.official_name;
+    let src='';
+    if(j.sources&&j.sources.length)src=' <span class="sources">参照: '+j.sources.map(u=>`<a href="${u}" target="_blank" rel="noopener">${(u+'').replace(/^https?:\/\//,'').slice(0,30)}</a>`).join(' / ')+'</span>';
+    setMsg('researchMsg','✅ 企業情報を反映しました。内容を確認・編集してください。',' ok');
+    if(src)el('researchMsg').innerHTML+=src;
+  }catch(e){setMsg('researchMsg','⚠️ '+e.message,'err');}
+  finally{btn.disabled=false;btn.innerHTML=old;}
+};
+
+// ---- 2) 過去ESアップロード ----
+const uploader=el('uploader'),fileInput=el('fileInput');
+uploader.onclick=()=>fileInput.click();
+uploader.addEventListener('dragover',e=>{e.preventDefault();uploader.classList.add('drag');});
+uploader.addEventListener('dragleave',()=>uploader.classList.remove('drag'));
+uploader.addEventListener('drop',e=>{e.preventDefault();uploader.classList.remove('drag');if(e.dataTransfer.files.length)handleFiles(e.dataTransfer.files);});
+fileInput.onchange=()=>{if(fileInput.files.length)handleFiles(fileInput.files);};
+
+async function handleFiles(files){
+  el('fileList').innerHTML=[...files].map(f=>`<li>📄 ${f.name}</li>`).join('');
+  if(!AI_ON){setMsg('uploadMsg','AI未設定のため自動解析できません。内容を手入力してください。','err');return;}
+  setMsg('uploadMsg','AIが過去ESを読み込んでいます（10〜30秒）…');
+  const fd=new FormData();[...files].slice(0,5).forEach(f=>fd.append('files',f));
+  try{
+    const r=await fetch('/api/analyze-es',{method:'POST',body:fd});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'解析に失敗しました');
+    const map={strength:'strength',epWhat:'epWhat',epRole:'epRole',epProblem:'epProblem',epAction:'epAction',epResult:'epResult',epLearn:'epLearn'};
+    Object.entries(map).forEach(([k,id])=>{if(j[k])el(id).value=j[k];});
+    pastEsText=Object.values(j).filter(v=>typeof v==='string').join('。');
+    setMsg('uploadMsg','✅ 過去ESから経験を抽出して各欄に反映しました。'+(j.summary?(' 要点: '+j.summary):''),'ok');
+  }catch(e){setMsg('uploadMsg','⚠️ '+e.message,'err');}
+}
+
+// ---- 3) AIでES生成（ストリーミング）----
+el('genAi').onclick=async()=>{
+  if(!val('company')||!val('strength')){alert('「会社名」と「あなたの強み」は入力してください。');return;}
+  if(!AI_ON){ // フォールバック: テンプレ生成
+    setMsg('uploadMsg','');
+    if(!val('values')){alert('AI未設定です。テンプレート生成には理念キーワードも入力してください。');return;}
+    render();el('out').scrollIntoView({behavior:'smooth',block:'center'});return;
+  }
+  const payload={
+    company:val('company'),values:val('values'),appeal:val('appeal'),
+    question:val('question'),limit:val('limit'),strength:val('strength'),
+    epWhat:val('epWhat'),epRole:val('epRole'),epProblem:val('epProblem'),
+    epAction:val('epAction'),epResult:val('epResult'),epLearn:val('epLearn'),
+    contrib:val('contrib'),pastEsText
+  };
+  const btn=el('genAi');const old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 生成中…';
+  el('out').textContent='';el('out').scrollIntoView({behavior:'smooth',block:'center'});
+  try{
+    const r=await fetch('/api/generate-es',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||'生成に失敗しました');}
+    const reader=r.body.getReader();const dec=new TextDecoder();
+    for(;;){const {done,value}=await reader.read();if(done)break;el('out').textContent+=dec.decode(value,{stream:true});updateCount();}
+    // 生成後にチェックリストを更新（企業接続などの観点で）
+    buildChecklist(el('out').innerText, detectType(val('question')), splitVals(val('values')));
+  }catch(e){el('out').textContent+='\n\n[エラー: '+e.message+']';}
+  finally{btn.disabled=false;btn.innerHTML=old;}
 };
 </script>
 </body>

@@ -1,0 +1,17 @@
+{
+  "name": "es-tailor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "企業に合わせるES作成支援アプリ（Claude API + 企業AI検索 + 過去ESアップロード）",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0",
+    "express": "^5.1.0",
+    "mammoth": "^1.8.0",
+    "multer": "^2.0.0"
+  }
+}
