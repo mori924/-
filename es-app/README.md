@@ -38,6 +38,35 @@ npm start          # → http://localhost:5050 を開く
 - `index.html` — フロントエンド（AI無効時はテンプレート生成にフォールバック）
 - 依存: `@anthropic-ai/sdk`, `express`, `multer`(アップロード), `mammoth`(Word抽出)
 
+## 公開URL化（デプロイ）
+
+バックエンド（Node）が必要なため、静的ホスト（GitHub Pages等）では動きません。Node を実行できるホストにデプロイします。
+どのホストでも、**環境変数 `ANTHROPIC_API_KEY` をダッシュボードで設定**してください（コードには含めない）。
+
+### Render（最も簡単・無料枠あり）
+1. https://render.com にGitHubでログイン → **New → Blueprint**
+2. このリポジトリを選択（`es-app/render.yaml` を自動検出）
+3. デプロイ時に環境変数 `ANTHROPIC_API_KEY` を入力
+4. 発行されるURL（例 `https://es-tailor.onrender.com`）で公開完了
+
+### Fly.io（東京リージョン・Dockerfile）
+```bash
+cd es-app
+fly launch --no-deploy        # fly.toml を検出
+fly secrets set ANTHROPIC_API_KEY=sk-ant-...
+fly deploy
+```
+
+### Docker（任意のVPS/クラウド）
+```bash
+cd es-app
+docker build -t es-tailor .
+docker run -p 8080:8080 -e ANTHROPIC_API_KEY=sk-ant-... es-tailor
+# → http://localhost:8080
+```
+
+サーバーは `PORT` 環境変数を尊重します（Render/Fly が自動設定）。ローカル既定は 5050、Docker既定は 8080。
+
 ## 注意
 
 - アップロードしたファイルとフォーム入力は、あなたのサーバー経由で Anthropic API に送信されます（自分のAPIキーで動作）。第三者には公開されません。

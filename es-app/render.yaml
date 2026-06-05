@@ -1,0 +1,12 @@
+# Render Blueprint — https://render.com  (Deploy → New Blueprint → repo を選択)
+services:
+  - type: web
+    name: es-tailor
+    runtime: node
+    rootDir: es-app
+    plan: free
+    buildCommand: npm ci
+    startCommand: node server.js
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # ダッシュボードで手入力（コミットしない）

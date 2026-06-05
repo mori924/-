@@ -78,6 +78,8 @@
   .uploader{border:1.5px dashed #c3cad9;border-radius:10px;padding:14px;text-align:center;cursor:pointer;
     background:#fafbff;transition:.15s;margin-bottom:12px}
   .uploader:hover,.uploader.drag{border-color:var(--accent);background:#f0f5ff}
+  .uploader.disabled{opacity:.5;pointer-events:none;filter:grayscale(.4)}
+  .ai-btn:disabled{background:#9ca3af}
   .uploader small{color:var(--muted);display:block;margin-top:4px}
   .filelist{font-size:12px;color:var(--ink);margin:6px 0 0;text-align:left}
   .filelist li{padding:2px 0}
@@ -453,8 +455,14 @@ function setMsg(id,text,kind){const e=el(id);e.textContent=text||'';e.className=
     el('aiStatusTxt').textContent='オフライン（テンプレートのみ）';
   }
   if(!AI_ON){
-    // バックエンドが無い/未設定: AI系UIは案内のみ
-    el('genAi').disabled=false; // 押すとテンプレにフォールバック
+    // AI未設定: 企業検索とアップロードは無効化し、生成はテンプレートのみに
+    el('researchBtn').disabled=true;
+    el('researchBtn').title='AIを使うには ANTHROPIC_API_KEY を設定してください';
+    el('uploader').classList.add('disabled');
+    el('uploader').title='AIを使うには ANTHROPIC_API_KEY を設定してください';
+    el('genAi').style.display='none';   // AI生成ボタンを隠す
+    el('gen').style.flex='1';           // テンプレートボタンを全幅に
+    el('gen').textContent='✍️ ESを生成する（テンプレート）';
   }
 })();
 
@@ -472,14 +480,17 @@ el('researchBtn').onclick=async()=>{
     if(!r.ok)throw new Error(j.error||'検索に失敗しました');
     if(j.values&&j.values.length)el('values').value=j.values.join(', ');
     if(j.appeal)el('appeal').value=j.appeal+(j.culture?(' / '+j.culture):'');
-    if(j.official_name&&!val('company'))el('company').value=j.official_name;
-    let src='';
-    if(j.sources&&j.sources.length)src=' <span class="sources">参照: '+j.sources.map(u=>`<a href="${u}" target="_blank" rel="noopener">${(u+'').replace(/^https?:\/\//,'').slice(0,30)}</a>`).join(' / ')+'</span>';
-    setMsg('researchMsg','✅ 企業情報を反映しました。内容を確認・編集してください。',' ok');
-    if(src)el('researchMsg').innerHTML+=src;
+    if(j.official_name)el('company').value=j.official_name;
+    setMsg('researchMsg','✅ 企業情報を反映しました。内容を確認・編集してください。','ok');
+    let extra='';
+    if(j.business)extra+=`<div class="sources">🏢 事業: ${j.business}</div>`;
+    if(j.sources&&j.sources.length)extra+='<div class="sources">参照: '+j.sources.map(u=>`<a href="${u}" target="_blank" rel="noopener">${(u+'').replace(/^https?:\/\//,'').slice(0,34)}</a>`).join(' / ')+'</div>';
+    if(extra)el('researchMsg').innerHTML+=extra;
   }catch(e){setMsg('researchMsg','⚠️ '+e.message,'err');}
   finally{btn.disabled=false;btn.innerHTML=old;}
 };
+// 会社名でEnter → 検索
+el('company').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(AI_ON)el('researchBtn').click();}});
 
 // ---- 2) 過去ESアップロード ----
 const uploader=el('uploader'),fileInput=el('fileInput');
