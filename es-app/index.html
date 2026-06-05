@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ES Tailor — 企業に合わせるES作成支援</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --panel:#ffffff; --line:#e3e6ee; --ink:#1d2433; --muted:#6b7488;
+    --accent:#2563eb; --accent-d:#1d4ed8; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444;
+    --chip:#eef2ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.7;-webkit-font-smoothing:antialiased}
+  header{background:linear-gradient(120deg,#1e3a8a,#2563eb);color:#fff;padding:18px 24px}
+  header h1{margin:0;font-size:20px;letter-spacing:.5px}
+  header p{margin:4px 0 0;font-size:13px;opacity:.9}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px}
+  .card h2{margin:0 0 14px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .card h2 .n{background:var(--accent);color:#fff;width:22px;height:22px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+  label.f{display:block;margin-bottom:12px;font-size:13px;color:var(--muted)}
+  label.f span.req{color:var(--bad);margin-left:4px}
+  input[type=text],textarea,select{width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:9px;font:inherit;color:var(--ink);background:#fff;resize:vertical}
+  input[type=text]:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  textarea{min-height:64px}
+  .row{display:flex;gap:12px}.row>*{flex:1}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{background:var(--chip);border:1px solid #dfe5ff;color:var(--accent-d);border-radius:999px;
+    padding:3px 11px;font-size:12px;cursor:pointer}
+  .chip:hover{background:#e0e7ff}
+  .qpresets{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}
+  .qpresets button{background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 10px;
+    font-size:12px;cursor:pointer;color:var(--muted)}
+  .qpresets button.active,.qpresets button:hover{border-color:var(--accent);color:var(--accent-d)}
+  .gen-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:13px;
+    font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}
+  .gen-btn:hover{background:var(--accent-d)}
+  .out{white-space:pre-wrap;background:#fbfcff;border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;min-height:220px;font-size:14.5px}
+  .out:empty::before{content:"左で入力して「ESを生成」を押すと、ここに下書きが表示されます。";color:#aab;}
+  .meta{display:flex;justify-content:space-between;align-items:center;margin:10px 0;flex-wrap:wrap;gap:8px}
+  .count{font-size:13px;color:var(--muted)}
+  .count b{font-size:18px;color:var(--ink)}
+  .count.over b{color:var(--bad)}
+  .count.good b{color:var(--ok)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+  .toolbar button{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 12px;
+    font-size:13px;cursor:pointer}
+  .toolbar button:hover{border-color:var(--accent);color:var(--accent-d)}
+  .check{list-style:none;padding:0;margin:8px 0 0;font-size:13px}
+  .check li{padding:6px 0 6px 26px;position:relative;color:var(--ink)}
+  .check li::before{position:absolute;left:0;top:5px;font-size:14px}
+  .check li.ok::before{content:"✅"}
+  .check li.warn::before{content:"⚠️"}
+  .check li small{color:var(--muted)}
+  .note{background:#fffbeb;border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:10px 13px;
+    font-size:12.5px;color:#7a5b13;margin-top:10px}
+  .disc{font-size:12px;color:var(--muted);text-align:center;padding:18px}
+  details{margin-top:10px}summary{cursor:pointer;font-size:13px;color:var(--accent-d)}
+  .seedbox{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>📝 ES Tailor — 企業に合わせるES作成支援</h1>
+  <p>会社情報とあなたの経験を入力すると、その企業の価値観に接続した「受かるESの型」であなた自身のES下書きを組み立てます。</p>
+</header>
+
+<div class="wrap">
+  <!-- ============ INPUT ============ -->
+  <div>
+    <div class="card">
+      <h2><span class="n">1</span>企業の情報</h2>
+      <label class="f">会社名<span class="req">*</span>
+        <input id="company" type="text" placeholder="例：株式会社〇〇" />
+      </label>
+      <div class="seedbox">よく知られた企業の公開理念キーワードを参考に入れられます（必ず公式HPで確認・編集してください）：</div>
+      <div class="chips" id="seedChips"></div>
+      <label class="f" style="margin-top:10px">企業の理念・求める人物像キーワード<span class="req">*</span>
+        <input id="values" type="text" placeholder="例：挑戦, チームワーク, 顧客第一, 誠実" />
+        <div class="seedbox">公式HPの「企業理念」「求める人材」からキーワードを抜き出して、カンマ区切りで。</div>
+      </label>
+      <label class="f">この企業に魅力を感じる点 / 事業の特徴
+        <textarea id="appeal" placeholder="例：社会インフラを支える事業で、若手から裁量を持って挑戦できる風土に惹かれた"></textarea>
+      </label>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">2</span>設問（ESのお題）</h2>
+      <div class="qpresets" id="qpresets"></div>
+      <label class="f">設問文<span class="req">*</span>
+        <input id="question" type="text" placeholder="例：当社を志望する理由を教えてください。" />
+      </label>
+      <label class="f" style="max-width:200px">指定文字数
+        <div class="row">
+          <input id="limit" type="text" value="400" />
+        </div>
+      </label>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">3</span>あなたの経験（素材）</h2>
+      <label class="f">あなたの強み（一言）<span class="req">*</span>
+        <input id="strength" type="text" placeholder="例：粘り強く周囲を巻き込む力" />
+      </label>
+      <label class="f">取り組んだこと / テーマ<span class="req">*</span>
+        <input id="epWhat" type="text" placeholder="例：所属するテニスサークルの新歓活動" />
+      </label>
+      <label class="f">あなたの立場・規模
+        <input id="epRole" type="text" placeholder="例：50人規模のサークルの新歓代表" />
+      </label>
+      <label class="f">直面した課題・困難
+        <textarea id="epProblem" placeholder="例：コロナ禍で新入生の入会率が前年比6割に落ち込んでいた"></textarea>
+      </label>
+      <label class="f">具体的な行動・工夫
+        <textarea id="epAction" placeholder="例：オンライン体験会を企画し、SNS運用とOB訪問を分担して実行した"></textarea>
+      </label>
+      <label class="f">結果（できれば数字で）
+        <input id="epResult" type="text" placeholder="例：入会者数を前年比180%に回復させた" />
+      </label>
+      <label class="f">そこから学んだこと
+        <textarea id="epLearn" placeholder="例：課題を分解し周囲を巻き込めば、困難な状況でも成果を出せると学んだ"></textarea>
+      </label>
+      <label class="f">入社後にやりたいこと / 貢献
+        <input id="contrib" type="text" placeholder="例：法人営業として顧客の課題解決に貢献したい" />
+      </label>
+    </div>
+
+    <button class="gen-btn" id="gen">✍️ ESを生成する</button>
+  </div>
+
+  <!-- ============ OUTPUT ============ -->
+  <div>
+    <div class="card">
+      <h2><span class="n">4</span>生成されたES下書き</h2>
+      <div class="meta">
+        <div class="count" id="countWrap">文字数 <b id="count">0</b> <span id="limitTxt"></span></div>
+        <div class="toolbar">
+          <button id="copy">📋 コピー</button>
+          <button id="download">⬇ 保存(.txt)</button>
+        </div>
+      </div>
+      <div class="out" id="out" contenteditable="true" spellcheck="false"></div>
+      <div class="note">これはあなたの入力をもとにした<b>下書き（たたき台）</b>です。必ず自分の言葉に直し、エピソードの具体性と数字を足してください。コピペ提出はNGです。</div>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">5</span>セルフ添削チェック</h2>
+      <ul class="check" id="checklist"><li class="warn">生成すると、ここに改善チェックが表示されます。</li></ul>
+    </div>
+  </div>
+</div>
+
+<div class="disc">
+  ES Tailor — 他者のESを転載・複製するものではありません。公開されている企業理念等の情報と、あなた自身の経験から、独自のESを構成する支援ツールです。
+</div>
+
+<script>
+// ---------- 公開されている代表的な企業理念キーワード（参考・要編集） ----------
+const SEEDS = {
+  "トヨタ自動車":["可動性(モビリティ)で社会を豊かに","現地現物","改善","チームワーク","挑戦"],
+  "ソニー":["クリエイティビティとテクノロジー","好奇心","多様性","ユーザー視点","挑戦"],
+  "リクルート":["新しい価値の創造","圧倒的当事者意識","個の尊重","変化を楽しむ"],
+  "三菱商事":["所期奉公","処事光明","立業貿易","誠実","チームワーク"],
+  "楽天":["イノベーション","常に改善・前進","成功のための努力","スピード‼スピード‼スピード‼"],
+  "アクセンチュア":["変化を生み出す","クライアント価値","多様性とインクルージョン","誠実さ"],
+};
+
+function el(id){return document.getElementById(id)}
+
+// seed chips
+const seedChips = el('seedChips');
+Object.keys(SEEDS).forEach(name=>{
+  const c=document.createElement('span');c.className='chip';c.textContent=name;
+  c.onclick=()=>{el('company').value=name; el('values').value=SEEDS[name].join(', ');};
+  seedChips.appendChild(c);
+});
+
+// question presets
+const QPRESETS=[
+  {k:'motivation',label:'志望動機',q:'当社を志望する理由を教えてください。'},
+  {k:'gakuchika',label:'ガクチカ',q:'学生時代に最も力を入れたことを教えてください。'},
+  {k:'selfpr',label:'自己PR',q:'あなたの強みを教えてください（自己PR）。'},
+  {k:'strengthweak',label:'長所・短所',q:'あなたの長所と短所を教えてください。'},
+  {k:'career',label:'キャリアプラン',q:'入社後に挑戦したいこと・キャリアプランを教えてください。'},
+];
+const qp=el('qpresets');
+let activeType='motivation';
+QPRESETS.forEach(p=>{
+  const b=document.createElement('button');b.textContent=p.label;
+  if(p.k==='motivation')b.classList.add('active');
+  b.onclick=()=>{activeType=p.k; el('question').value=p.q;
+    [...qp.children].forEach(x=>x.classList.remove('active')); b.classList.add('active');};
+  qp.appendChild(b);
+});
+el('question').value=QPRESETS[0].q;
+
+// ---------- helpers ----------
+function val(id){return el(id).value.trim()}
+function splitVals(s){return s.split(/[,、\s]+/).map(x=>x.trim()).filter(Boolean)}
+function jLen(s){return [...s.replace(/\n/g,'')].length} // 改行を除いた文字数
+// 文末を整える
+function j(...parts){return parts.filter(Boolean).join('')}
+function sentence(s){if(!s)return'';s=s.trim();if(!/[。.！!？?」]$/.test(s))s+='。';return s}
+
+// 設問種別の自動判定（プリセット未使用時の保険）
+function detectType(q){
+  if(/志望|なぜ当社|当社を選/.test(q))return'motivation';
+  if(/力を入れ|注力|取り組(ん|み)|学生時代|ガクチカ/.test(q))return'gakuchika';
+  if(/長所|短所/.test(q))return'strengthweak';
+  if(/キャリア|入社後|将来|挑戦したい/.test(q))return'career';
+  if(/強み|自己PR|アピール/.test(q))return'selfpr';
+  return activeType;
+}
+
+// ---------- 生成ロジック ----------
+function buildES(){
+  const company=val('company')||'貴社';
+  const values=splitVals(val('values'));
+  const v1=values[0]||'挑戦';
+  const v2=values[1]||values[0]||'成長';
+  const appeal=val('appeal');
+  const strength=val('strength')||'課題に粘り強く取り組む力';
+  const epWhat=val('epWhat');
+  const epRole=val('epRole');
+  const epProblem=val('epProblem');
+  const epAction=val('epAction');
+  const epResult=val('epResult');
+  const epLearn=val('epLearn');
+  const contrib=val('contrib');
+  const type=detectType(val('question'));
+
+  // 自由入力の語尾を判定して定型文と自然につなぐ
+  const endsWant=t=>/(たい|たいです)$/.test(t);
+  const endsVerb=t=>/(る|た|だ|った|して|した|せた|えた|いた|んだ|きた|う|く|ぐ|す|つ|ぶ|む|ない|ます|ました)$/.test(t);
+  // 常体の動詞語尾を敬体（です・ます調）に変換
+  const polite=(t)=>{
+    const map=[['させた','させました'],['された','されました'],['した','しました'],
+      // ぶ動詞（〜んだ → 〜びました）は個別に
+      ['学んだ','学びました'],['選んだ','選びました'],['遊んだ','遊びました'],
+      ['呼んだ','呼びました'],['喜んだ','喜びました'],['並んだ','並びました'],
+      ['んだ','みました'],['った','いました'],['いた','きました'],['えた','えました'],
+      ['けた','けました'],['げた','げました'],['ねた','ねました'],['べた','べました'],
+      ['めた','めました'],['てた','てました'],['きた','きました']];
+    for(const [a,b] of map){ if(t.endsWith(a)) return t.slice(0,-a.length)+b; }
+    return t;
+  };
+  // 過去の行動・結果を1文に整える（動詞で終われば敬体化、名詞句なら接尾辞を補う）
+  const clause=(t,suffix)=> !t ? '' : (endsVerb(t) ? polite(t)+'。' : t+suffix+'。');
+  // 願望文に整える（「〜したい」で終わればそのまま、それ以外は補う）
+  const wish=(t,fallback,tail='と考えております。')=>
+    !t ? '' : (endsWant(t) ? t+tail : t+fallback+tail);
+
+  // 共通：エピソードのSTAR本文
+  const star=()=>{
+    const intro=epRole?`${epRole}として、`:'';
+    const s1=epWhat?`${intro}${endsVerb(epWhat)?polite(epWhat)+'。':epWhat+'に取り組みました。'}`:'';
+    const s2=epProblem?`当初は${epProblem}という課題がありました。`:'';
+    const s3=epAction?`そこで私は、${clause(epAction,'に取り組みました')}`:'';
+    const s4=epResult?`その結果、${clause(epResult,'という成果を上げました')}`:'';
+    return j(s1,s2,s3,s4);
+  };
+  const learn=epLearn?`この経験から、${clause(epLearn,'を学びました')}`:'';
+
+  let body='';
+  if(type==='motivation'){
+    const reason = appeal
+      ? `私が${company}を志望する理由は、${sentence(appeal).replace(/。$/,'')}点に強く惹かれたためです。`
+      : `私が${company}を志望する理由は、${v1}を大切にする姿勢に強く共感したためです。`;
+    const bridge=`中でも、${company}が掲げる「${v1}」という価値観は、${strength}という私の強みと深く重なると感じています。`;
+    const proof=star()||`私は${strength}を活かし、困難な状況でも成果を出すことを意識してきました。`;
+    const fit=learn||`この強みは、${company}の事業においても必ず活かせると考えています。`;
+    const close=contrib
+      ? `入社後は、${strength}を活かし、${wish(contrib,`を通じて${company}に貢献したい`)}`
+      : `入社後は、${strength}を活かし、${v2}を体現し続ける一員として${company}に貢献したいと考えております。`;
+    body=j(reason,bridge,proof,fit,close);
+  }
+  else if(type==='gakuchika'){
+    const head=epWhat?`私が学生時代に最も力を入れたのは、${epWhat}です。`:`私が学生時代に最も力を入れたのは、${strength}を発揮した取り組みです。`;
+    const intro=epRole?`${epRole}として活動する中で、`:'';
+    const s2=epProblem?`${intro}${epProblem}という課題に直面しました。`:'';
+    const s3=epAction?`そこで私は、${clause(epAction,'に取り組みました')}`:'';
+    const s4=epResult?`その結果、${clause(epResult,'という成果を上げました')}`:'';
+    const close=contrib
+      ? `この経験で培った${strength}を、${company}でも活かし、${wish(contrib,'に貢献したい','と考えています。')}`
+      : `この経験で培った${strength}を、${company}でも${v1}の姿勢で貢献することに活かしたいと考えています。`;
+    body=j(head,s2,s3,s4,learn,close);
+  }
+  else if(type==='selfpr'){
+    const head=`私の強みは、${strength}です。`;
+    const s2=epWhat?`${epRole?epRole+'として、':''}${epWhat}に取り組んだ際、${epProblem?epProblem+'という課題':'困難な状況'}に直面しました。`:'';
+    const s3=epAction?`そこで私は、${clause(epAction,'に取り組みました')}`:'私は主体的に行動しました。';
+    const s4=epResult?`その結果、${clause(epResult,'という成果を上げました')}`:'';
+    const reUse=learn||`この強みは再現性があり、環境が変わっても発揮できると考えています。`;
+    const close=contrib
+      ? `${company}でもこの${strength}を活かし、「${v1}」を体現する人材として、${wish(contrib,'に貢献したい','と考えています。')}`
+      : `${company}でもこの${strength}を活かし、「${v1}」を体現する人材として価値を提供します。`;
+    body=j(head,s2,j(s3,s4),reUse,close);
+  }
+  else if(type==='strengthweak'){
+    const long=`私の長所は、${strength}です。`;
+    const lex=star()||`${strength}を活かし、主体的に課題解決へ取り組んできました。`;
+    const weak=`一方で短所は、${strength}ゆえに一つの物事に集中しすぎる点です。現在は、優先順位を都度確認し、周囲に進捗を共有することで改善に努めています。`;
+    const close=`この長所を${company}の「${v1}」の現場で活かし、短所と向き合いながら成長したいと考えています。`;
+    body=j(long,lex,weak,close);
+  }
+  else if(type==='career'){
+    const head=contrib
+      ? `私は${company}で、${wish(contrib,'を実現したい','と考えています。')}`
+      : `私は${company}で、${v1}を軸としたキャリアを実現したいと考えています。`;
+    const why=appeal?`${sentence(appeal)}`:`${company}が${v1}を重視している点に強く惹かれています。`;
+    const base=star()||`これまで${strength}を強みに、課題解決に取り組んできました。`;
+    const close=j(learn,`将来的には、${strength}を活かして${v2}を牽引し、${company}と社会に貢献できる人材を目指します。`);
+    body=j(head,why,base,close);
+  }
+
+  return {body,type,values};
+}
+
+// 文字数調整（指定の±に近づける簡易トリム情報のみ。本文はそのまま提示）
+function render(){
+  const {body,type,values}=buildES();
+  el('out').textContent=body;
+  updateCount();
+  buildChecklist(body,type,values);
+}
+
+function updateCount(){
+  const text=el('out').innerText;
+  const n=jLen(text);
+  el('count').textContent=n;
+  const limit=parseInt(val('limit'))||0;
+  const wrap=el('countWrap');wrap.classList.remove('over','good');
+  if(limit){
+    el('limitTxt').textContent=`/ ${limit}字（${Math.round(n/limit*100)}%）`;
+    if(n>limit)wrap.classList.add('over');
+    else if(n>=limit*0.8)wrap.classList.add('good');
+  }else{el('limitTxt').textContent='';}
+}
+
+function buildChecklist(body,type,values){
+  const ul=el('checklist');ul.innerHTML='';
+  const limit=parseInt(val('limit'))||0;const n=jLen(body);
+  const add=(ok,txt,sub)=>{const li=document.createElement('li');li.className=ok?'ok':'warn';
+    li.innerHTML=txt+(sub?` <small>${sub}</small>`:'');ul.appendChild(li);};
+
+  // 文字数
+  if(limit){
+    if(n>limit)add(false,`文字数オーバー（${n}/${limit}字）`,'一文を短く。修飾語と重複を削る');
+    else if(n<limit*0.7)add(false,`文字数が少なめ（${n}/${limit}字）`,'エピソードの具体・数字を追加');
+    else add(true,`文字数は適切（${n}/${limit}字）`);
+  }
+  // 企業接続
+  const usedValue=values.some(v=>v&&body.includes(v));
+  add(usedValue,'企業の価値観キーワードと接続している', usedValue?'':'理念キーワードを本文に織り込もう');
+  // 数字
+  add(/[0-9０-９]/.test(val('epResult')),'結果に数字が入っている','「○％」「○人」など定量で説得力UP');
+  // 具体的な行動
+  add(val('epAction').length>=10,'具体的な行動・工夫が書かれている','「何を・どう工夫したか」を具体的に');
+  // 結論ファースト
+  add(/^(私|私が|私の)/.test(body),'結論から書き出せている','最初の一文で結論を述べる');
+  // 使い回し注意
+  add(val('appeal').length>0 || values.length>0,'その企業ならではの要素がある','他社でも通じる内容になっていないか確認');
+  // NGワード簡易チェック
+  const ng=['頑張りました','すごい','ヤバい','的な','なので'];
+  const found=ng.filter(w=>body.includes(w));
+  add(found.length===0,'話し言葉・抽象表現を避けている',found.length?`要修正: ${found.join(' / ')}`:'');
+}
+
+el('gen').onclick=()=>{
+  if(!val('company')||!val('values')||!val('strength')){
+    alert('「会社名」「理念キーワード」「あなたの強み」は入力してください。');return;
+  }
+  render();
+  el('out').scrollIntoView({behavior:'smooth',block:'center'});
+};
+el('out').addEventListener('input',updateCount);
+el('limit').addEventListener('input',updateCount);
+
+el('copy').onclick=async()=>{
+  await navigator.clipboard.writeText(el('out').innerText);
+  el('copy').textContent='✅ コピー済み';setTimeout(()=>el('copy').textContent='📋 コピー',1500);
+};
+el('download').onclick=()=>{
+  const blob=new Blob([el('out').innerText],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`ES_${val('company')||'draft'}_${activeType}.txt`;a.click();
+};
+</script>
+</body>
+</html>
