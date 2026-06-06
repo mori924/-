@@ -113,6 +113,13 @@
         </div>
       </label>
       <div class="ai-msg" id="researchMsg"></div>
+      <label class="f">企業サイトのURL（API不要・無料で自動抽出）
+        <div class="inline-row">
+          <input id="companyUrl" type="text" placeholder="例：https://www.kao.com/jp/corporate/ （理念/会社情報ページが理想）" />
+          <button class="ai-btn" id="extractBtn" type="button" style="background:#10b981" title="公式サイトから企業名・理念キーワードを自動抽出します（課金なし）">🌐 抽出</button>
+        </div>
+      </label>
+      <div class="ai-msg" id="extractMsg"></div>
       <div class="seedbox">よく知られた企業の公開理念キーワードを参考に入れられます（必ず公式HPで確認・編集してください）：</div>
       <div class="chips" id="seedChips"></div>
       <label class="f" style="margin-top:10px">企業の理念・求める人物像キーワード<span class="req">*</span>
@@ -491,6 +498,30 @@ el('researchBtn').onclick=async()=>{
 };
 // 会社名でEnter → 検索
 el('company').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(AI_ON)el('researchBtn').click();}});
+
+// ---- 1b) 企業サイトURLから抽出（API不要・無料） ----
+el('extractBtn').onclick=async()=>{
+  const url=val('companyUrl');
+  if(!url){alert('企業サイトのURLを入力してください。');return;}
+  const btn=el('extractBtn');const old=btn.innerHTML;
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 抽出中…';
+  setMsg('extractMsg','公式サイトから情報を抽出しています…');
+  try{
+    const r=await fetch('/api/extract-company',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'抽出に失敗しました');
+    if(j.values&&j.values.length)el('values').value=j.values.join(', ');
+    if(j.appeal&&!val('appeal'))el('appeal').value=j.appeal;
+    if(j.name&&!val('company'))el('company').value=j.name;
+    setMsg('extractMsg','✅ 抽出しました（機械抽出の候補です。必ず確認・編集してください）','ok');
+    if(j.sources&&j.sources.length){
+      el('extractMsg').innerHTML+='<div class="sources">参照: '+j.sources.map(u=>`<a href="${u}" target="_blank" rel="noopener">${(u+'').replace(/^https?:\/\//,'').slice(0,36)}</a>`).join(' / ')+'</div>';
+    }
+  }catch(e){
+    setMsg('extractMsg','⚠️ '+e.message+'（サイトがbotを拒否する場合があります。理念/会社情報ページのURLを試すか、手入力してください）','err');
+  }finally{btn.disabled=false;btn.innerHTML=old;}
+};
+el('companyUrl').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el('extractBtn').click();}});
 
 // ---- 2) 過去ESアップロード ----
 const uploader=el('uploader'),fileInput=el('fileInput');

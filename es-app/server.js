@@ -225,6 +225,164 @@ app.post("/api/generate-es", async (req, res) => {
 
 app.get("/api/health", (req, res) => res.json({ ok: true, ai: hasKey, model: MODEL }));
 
+// ---------- 企業情報の抽出（LLM不使用・公式サイトURLから） ----------
+// 指定された公開URLを取得し、理念・求める人物像のキーワードを発見的に抽出する。
+// Anthropic API は使わないので課金は発生しない。
+const STOP = new Set([
+  "私たち","ます","です","こと","ため","する","おり","により","として","および","また","これ","その","お客様","当社","弊社","会社","企業","事業","世界","社会","人材","環境","とともに","ながら","もの","よう","https","http","www","reserved","rights","copyright","株式会社","ホーム","メニュー","ページ","採用","情報","お問い合わせ",
+  // ナビ・定型ノイズ
+  "社長挨拶","代表取締役","代表取締役社長","事業案内","会社概要","会社情報","企業情報","沿革","役員","拠点","グループ","ニュース","お知らせ","一覧","詳細","トップ","サイト","公式","投資家","ESG","サステナビリティ","ブランド","製品","サービス","トピックス","プライバシー","利用規約","個人情報","ログイン","検索","メッセージ","代表","役員一覧","数字で見る",
+]);
+// セクションのラベル語（価値そのものではない見出し）
+["企業理念","理念","存在意義","文化","価値創造","価値創造サイクル","コーポレートメッセージ","パーパス","ビジョン","ミッション","バリュー","行動指針","スローガン","ピックアップコンテンツ","公式SNSアカウント","数字で見る","トップメッセージ"].forEach((w)=>STOP.add(w));
+// 文の断片っぽいトークンを除外
+const FRAGMENT = /(挨拶|構成|されて|ています|について|に関する|はこちら|ください|から成|に基づ|を目指|を大切)/;
+// 候補トークンの正規化（先頭番号・「-Purpose-」等のラベル装飾を除去）
+function normToken(s) {
+  return s
+    .replace(/^[\s0-9０-９]+[．.、)）]\s*/, "")
+    .replace(/[-−–—]\s*(Purpose|Culture|Vision|Mission|Value|Way)\s*[-−–—]?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+const GENERIC_DESC = /掲載しています|ご紹介します|公式(企業)?サイト|総合サイト|について(ご案内|紹介)/;
+
+function isBlockedHost(host) {
+  return (
+    /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0|\[?::1\]?)/i.test(host) ||
+    /\.(local|internal)$/i.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  );
+}
+
+async function fetchText(url) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (ES-Tailor research bot)", "Accept-Language": "ja" },
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const ct = r.headers.get("content-type") || "";
+    if (!/text\/html|text\/plain|xml/.test(ct)) throw new Error("HTMLではありません");
+    return await r.text();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function metaContent(html, re) {
+  const m = html.match(re);
+  return m ? m[1].trim() : "";
+}
+function stripHtml(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// 理念ページの見出し(h1〜h4)から価値語の候補を拾う（見出しは価値表現が多い）
+function headingValues(html) {
+  const out = [];
+  const re = /<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const t = normToken(stripHtml(m[1]));
+    if (t.length >= 2 && t.length <= 16 && !STOP.has(t) && !FRAGMENT.test(t) && !/^[0-9０-９\s]+$/.test(t)) out.push(t);
+  }
+  return out;
+}
+
+// マーカー語の近傍から短い名詞句候補を拾う
+function keywordsNear(text) {
+  const markers = ["理念", "ミッション", "ビジョン", "バリュー", "価値観", "行動指針", "大切に", "求める人材", "求める人物", "私たちは", "Mission", "Vision", "Value", "Purpose"];
+  const found = [];
+  for (const mk of markers) {
+    let idx = 0;
+    const lower = text;
+    while ((idx = lower.indexOf(mk, idx)) !== -1 && found.length < 60) {
+      const seg = text.slice(idx + mk.length, idx + mk.length + 50);
+      seg
+        .split(/[、。・,.\/|｜\s「」『』（）()【】\-—　:：]+/)
+        .map((s) => normToken(s))
+        .filter((s) => s.length >= 2 && s.length <= 10 && !/^[0-9０-９]+$/.test(s) && !STOP.has(s) && !FRAGMENT.test(s))
+        .forEach((s) => found.push(s));
+      idx += mk.length;
+    }
+  }
+  // 出現頻度順に上位を返す
+  const freq = {};
+  found.forEach((w) => (freq[w] = (freq[w] || 0) + 1));
+  return Object.keys(freq)
+    .sort((a, b) => freq[b] - freq[a])
+    .slice(0, 8);
+}
+
+app.post("/api/extract-company", async (req, res) => {
+  let url = String(req.body.url || "").trim();
+  if (!url) return res.status(400).json({ error: "企業サイトのURLを入力してください。" });
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return res.status(400).json({ error: "URLの形式が正しくありません。" });
+  }
+  if (isBlockedHost(u.hostname)) return res.status(400).json({ error: "そのURLは取得できません。" });
+
+  try {
+    let html = await fetchText(u.href);
+
+    // 同一ドメインの「理念・会社情報・採用」ページがあれば1つだけ追加取得
+    const linkRe = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let m, extraUrl = null;
+    while ((m = linkRe.exec(html)) && !extraUrl) {
+      const label = stripHtml(m[2]);
+      if (/理念|ビジョン|ミッション|価値|会社情報|企業情報|about|company|philosophy|recruit|採用|求める/i.test(label)) {
+        try {
+          const abs = new URL(m[1], u.href);
+          if (abs.hostname === u.hostname && abs.href !== u.href && !isBlockedHost(abs.hostname)) extraUrl = abs.href;
+        } catch {/* ignore */}
+      }
+    }
+    let extraHtml = "";
+    if (extraUrl) {
+      try { extraHtml = await fetchText(extraUrl); } catch {/* ignore */}
+    }
+
+    const allHtml = html + "\n" + extraHtml;
+    const title = metaContent(html, /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i) ||
+      metaContent(html, /<title[^>]*>([^<]+)<\/title>/i);
+    const desc =
+      metaContent(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
+      metaContent(html, /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
+
+    const text = stripHtml(allHtml);
+    // 理念ページがあればその見出しを優先し、近傍キーワードで補完
+    const headings = extraHtml ? headingValues(extraHtml) : [];
+    const values = [...new Set([...headings, ...keywordsNear(text)])].slice(0, 8);
+
+    res.json({
+      name: (title || "").replace(/[|｜].*$/, "").replace(/(株式会社|有限会社)/g, "").trim().slice(0, 40),
+      values,
+      // SEO定型文（〜を掲載しています等）は志望動機に使うと不自然なので空にする
+      appeal: GENERIC_DESC.test(desc) ? "" : desc.slice(0, 140),
+      business: desc.slice(0, 80),
+      sources: [u.href, extraUrl].filter(Boolean),
+      note: "公式サイトから機械的に抽出した候補です。必ず確認・編集してください。",
+    });
+  } catch (err) {
+    res.status(502).json({ error: "サイトの取得に失敗しました: " + (err?.message || "unknown") });
+  }
+});
+
 function handleErr(res, err) {
   const status = err?.status || 500;
   const msg = err?.message || "";
