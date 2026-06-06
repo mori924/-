@@ -227,13 +227,21 @@ app.get("/api/health", (req, res) => res.json({ ok: true, ai: hasKey, model: MOD
 
 function handleErr(res, err) {
   const status = err?.status || 500;
+  const msg = err?.message || "";
   const map = {
     401: "APIキーが無効です。ANTHROPIC_API_KEY を確認してください。",
     429: "レート制限に達しました。しばらく待って再試行してください。",
     529: "APIが混雑しています。少し待って再試行してください。",
   };
-  console.error("API error:", err?.status, err?.message);
-  res.status(status).json({ error: map[status] || ("AIエラー: " + (err?.message || "unknown")) });
+  let friendly;
+  if (/credit balance is too low|Plans & Billing/i.test(msg)) {
+    friendly =
+      "Anthropicアカウントのクレジット残高が不足しています。console.anthropic.com の「Plans & Billing」でクレジットを購入してから、もう一度お試しください。";
+  } else {
+    friendly = map[status] || "AIエラー: " + (msg || "unknown");
+  }
+  console.error("API error:", status, msg.slice(0, 200));
+  res.status(status).json({ error: friendly });
 }
 
 const PORT = process.env.PORT || 5050;
